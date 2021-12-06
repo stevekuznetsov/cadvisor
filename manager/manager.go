@@ -603,21 +603,7 @@ func (m *manager) getAllNamespacedContainers(ns string) map[string]*containerDat
 
 func (m *manager) AllDockerContainers(query *info.ContainerInfoRequest) (map[string]info.ContainerInfo, error) {
 	containers := m.getAllNamespacedContainers(DockerNamespace)
-
-	output := make(map[string]info.ContainerInfo, len(containers))
-	for name, cont := range containers {
-		inf, err := m.containerDataToContainerInfo(cont, query)
-		if err != nil {
-			// Ignore the error because of race condition and return best-effort result.
-			if err == memory.ErrDataNotFound {
-				klog.Warningf("Error getting data for container %s because of race condition", name)
-				continue
-			}
-			return nil, err
-		}
-		output[name] = *inf
-	}
-	return output, nil
+	return m.getContainersInfo(containers, query)
 }
 
 func (m *manager) getDockerContainer(containerName string) (*containerData, error) {
@@ -1372,6 +1358,23 @@ func (m *manager) getFsInfoByDeviceName(deviceName string) (v2.FsInfo, error) {
 		}
 	}
 	return v2.FsInfo{}, fmt.Errorf("cannot find filesystem info for device %q", deviceName)
+}
+
+func (m *manager) getContainersInfo(containers map[string]*containerData, query *info.ContainerInfoRequest) (map[string]info.ContainerInfo, error) {
+	output := make(map[string]info.ContainerInfo, len(containers))
+	for name, cont := range containers {
+		inf, err := m.containerDataToContainerInfo(cont, query)
+		if err != nil {
+			// Ignore the error because of race condition and return best-effort result.
+			if err == memory.ErrDataNotFound {
+				klog.Warningf("Error getting data for container %s because of race condition", name)
+				continue
+			}
+			return nil, err
+		}
+		output[name] = *inf
+	}
+	return output, nil
 }
 
 func getVersionInfo() (*info.VersionInfo, error) {
