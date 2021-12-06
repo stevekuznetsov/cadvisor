@@ -587,14 +587,14 @@ func (m *manager) SubcontainersInfo(containerName string, query *info.ContainerI
 	return m.containerDataSliceToContainerInfoSlice(containers, query)
 }
 
-func (m *manager) getAllDockerContainers() map[string]*containerData {
+func (m *manager) getAllNamespacedContainers(ns string) map[string]*containerData {
 	m.containersLock.RLock()
 	defer m.containersLock.RUnlock()
 	containers := make(map[string]*containerData, len(m.containers))
 
-	// Get containers in the Docker namespace.
+	// Get containers in the namespace.
 	for name, cont := range m.containers {
-		if name.Namespace == DockerNamespace {
+		if name.Namespace == ns {
 			containers[cont.info.Name] = cont
 		}
 	}
@@ -602,7 +602,7 @@ func (m *manager) getAllDockerContainers() map[string]*containerData {
 }
 
 func (m *manager) AllDockerContainers(query *info.ContainerInfoRequest) (map[string]info.ContainerInfo, error) {
-	containers := m.getAllDockerContainers()
+	containers := m.getAllNamespacedContainers(DockerNamespace)
 
 	output := make(map[string]info.ContainerInfo, len(containers))
 	for name, cont := range containers {
@@ -735,7 +735,7 @@ func (m *manager) getRequestedContainers(containerName string, options v2.Reques
 			if containerName != "/" {
 				return containersMap, fmt.Errorf("invalid request for docker container %q with subcontainers", containerName)
 			}
-			containersMap = m.getAllDockerContainers()
+			containersMap = m.getAllNamespacedContainers(DockerNamespace)
 		}
 	default:
 		return containersMap, fmt.Errorf("invalid request type %q", options.IdType)
