@@ -134,7 +134,7 @@ func ValidateInfo() (*dockertypes.Info, error) {
 		}
 		dockerInfo.ServerVersion = version.Version
 	}
-	version, err := parseVersion(dockerInfo.ServerVersion, versionRe, 3)
+	version, err := ParseVersion(dockerInfo.ServerVersion, VersionRe, 3)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func APIVersion() ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	return parseVersion(ver, apiVersionRe, 2)
+	return ParseVersion(ver, apiVersionRe, 2)
 }
 
 func VersionString() (string, error) {
@@ -182,7 +182,7 @@ func APIVersionString() (string, error) {
 	return apiVersion, err
 }
 
-func parseVersion(versionString string, regex *regexp.Regexp, length int) ([]int, error) {
+func ParseVersion(versionString string, regex *regexp.Regexp, length int) ([]int, error) {
 	matches := regex.FindAllStringSubmatch(versionString, -1)
 	if len(matches) != 1 {
 		return nil, fmt.Errorf("version string \"%v\" doesn't match expected regular expression: \"%v\"", versionString, regex.String())
