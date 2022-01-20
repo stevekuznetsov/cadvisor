@@ -58,7 +58,7 @@ type dockerContainerHandler struct {
 	cgroupPaths map[string]string
 
 	// the docker storage driver
-	storageDriver    storageDriver
+	storageDriver    StorageDriver
 	fsInfo           fs.FsInfo
 	rootfsStorageDir string
 
@@ -97,7 +97,7 @@ type dockerContainerHandler struct {
 
 var _ container.ContainerHandler = &dockerContainerHandler{}
 
-func getRwLayerID(containerID, storageDir string, sd storageDriver, dockerVersion []int) (string, error) {
+func getRwLayerID(containerID, storageDir string, sd StorageDriver, dockerVersion []int) (string, error) {
 	const (
 		// Docker version >=1.10.0 have a randomized ID for the root fs of a container.
 		randomizedRWLayerMinorVersion = 10
@@ -120,7 +120,7 @@ func newDockerContainerHandler(
 	name string,
 	machineInfoFactory info.MachineInfoFactory,
 	fsInfo fs.FsInfo,
-	storageDriver storageDriver,
+	storageDriver StorageDriver,
 	storageDir string,
 	cgroupSubsystems map[string]string,
 	inHostNamespace bool,

@@ -96,21 +96,21 @@ func RootDir() string {
 	return dockerRootDir
 }
 
-type storageDriver string
+type StorageDriver string
 
 const (
-	devicemapperStorageDriver storageDriver = "devicemapper"
-	aufsStorageDriver         storageDriver = "aufs"
-	overlayStorageDriver      storageDriver = "overlay"
-	overlay2StorageDriver     storageDriver = "overlay2"
-	zfsStorageDriver          storageDriver = "zfs"
-	vfsStorageDriver          storageDriver = "vfs"
+	devicemapperStorageDriver StorageDriver = "devicemapper"
+	aufsStorageDriver         StorageDriver = "aufs"
+	overlayStorageDriver      StorageDriver = "overlay"
+	overlay2StorageDriver     StorageDriver = "overlay2"
+	zfsStorageDriver          StorageDriver = "zfs"
+	vfsStorageDriver          StorageDriver = "vfs"
 )
 
 type dockerFactory struct {
 	machineInfoFactory info.MachineInfoFactory
 
-	storageDriver storageDriver
+	storageDriver StorageDriver
 	storageDir    string
 
 	client *docker.Client
@@ -356,7 +356,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 		zfsWatcher      *zfs.ZfsWatcher
 	)
 	if includedMetrics.Has(container.DiskUsageMetrics) {
-		if storageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
+		if StorageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
 			thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
 			if err != nil {
 				klog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
@@ -367,7 +367,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 			thinPoolName = status.DriverStatus[dockerutil.DriverStatusPoolName]
 		}
 
-		if storageDriver(dockerInfo.Driver) == zfsStorageDriver {
+		if StorageDriver(dockerInfo.Driver) == zfsStorageDriver {
 			zfsWatcher, err = startZfsWatcher(dockerInfo)
 			if err != nil {
 				klog.Errorf("zfs filesystem stats will not be reported: %v", err)
@@ -383,7 +383,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 		dockerAPIVersion:   dockerAPIVersion,
 		fsInfo:             fsInfo,
 		machineInfoFactory: factory,
-		storageDriver:      storageDriver(dockerInfo.Driver),
+		storageDriver:      StorageDriver(dockerInfo.Driver),
 		storageDir:         RootDir(),
 		includedMetrics:    includedMetrics,
 		thinPoolName:       thinPoolName,
