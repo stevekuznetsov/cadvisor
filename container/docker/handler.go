@@ -378,17 +378,17 @@ func (h *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error {
 	}
 	var device string
 	switch h.storageDriver {
-	case devicemapperStorageDriver:
+	case DevicemapperStorageDriver:
 		// Device has to be the pool name to correlate with the device name as
 		// set in the machine info filesystems.
 		device = h.poolName
-	case aufsStorageDriver, overlayStorageDriver, overlay2StorageDriver, vfsStorageDriver:
+	case AufsStorageDriver, OverlayStorageDriver, Overlay2StorageDriver, VfsStorageDriver:
 		deviceInfo, err := h.fsInfo.GetDirFsDevice(h.rootfsStorageDir)
 		if err != nil {
 			return fmt.Errorf("unable to determine device info for dir: %v: %v", h.rootfsStorageDir, err)
 		}
 		device = deviceInfo.Device
-	case zfsStorageDriver:
+	case ZfsStorageDriver:
 		device = h.zfsParent
 	default:
 		return nil

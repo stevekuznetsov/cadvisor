@@ -99,12 +99,12 @@ func RootDir() string {
 type StorageDriver string
 
 const (
-	devicemapperStorageDriver StorageDriver = "devicemapper"
-	aufsStorageDriver         StorageDriver = "aufs"
-	overlayStorageDriver      StorageDriver = "overlay"
-	overlay2StorageDriver     StorageDriver = "overlay2"
-	zfsStorageDriver          StorageDriver = "zfs"
-	vfsStorageDriver          StorageDriver = "vfs"
+	DevicemapperStorageDriver StorageDriver = "devicemapper"
+	AufsStorageDriver         StorageDriver = "aufs"
+	OverlayStorageDriver      StorageDriver = "overlay"
+	Overlay2StorageDriver     StorageDriver = "overlay2"
+	ZfsStorageDriver          StorageDriver = "zfs"
+	VfsStorageDriver          StorageDriver = "vfs"
 )
 
 type dockerFactory struct {
@@ -356,7 +356,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 		zfsWatcher      *zfs.ZfsWatcher
 	)
 	if includedMetrics.Has(container.DiskUsageMetrics) {
-		if StorageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
+		if StorageDriver(dockerInfo.Driver) == DevicemapperStorageDriver {
 			thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
 			if err != nil {
 				klog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
@@ -367,7 +367,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 			thinPoolName = status.DriverStatus[dockerutil.DriverStatusPoolName]
 		}
 
-		if StorageDriver(dockerInfo.Driver) == zfsStorageDriver {
+		if StorageDriver(dockerInfo.Driver) == ZfsStorageDriver {
 			zfsWatcher, err = startZfsWatcher(dockerInfo)
 			if err != nil {
 				klog.Errorf("zfs filesystem stats will not be reported: %v", err)
