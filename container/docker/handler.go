@@ -23,6 +23,11 @@ import (
 	"strings"
 	"time"
 
+	dockercontainer "github.com/docker/docker/api/types/container"
+	docker "github.com/docker/docker/client"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"golang.org/x/net/context"
+
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
 	dockerutil "github.com/google/cadvisor/container/docker/utils"
@@ -31,12 +36,6 @@ import (
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/zfs"
-	"github.com/opencontainers/runc/libcontainer/cgroups"
-
-	dockercontainer "github.com/docker/docker/api/types/container"
-	docker "github.com/docker/docker/client"
-	"golang.org/x/net/context"
-	"k8s.io/klog/v2"
 )
 
 const (
