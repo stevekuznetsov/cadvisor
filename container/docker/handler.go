@@ -367,99 +367,6 @@ func (h *dockerContainerHandler) GetSpec() (info.ContainerSpec, error) {
 	return spec, err
 }
 
-func (h *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error {
-	mi, err := h.machineInfoFactory.GetMachineInfo()
-	if err != nil {
-		return err
-	}
-
-	if h.includedMetrics.Has(container.DiskIOMetrics) {
-		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
-	}
-
-	if !h.includedMetrics.Has(container.DiskUsageMetrics) {
-		return nil
-	}
-	var device string
-	switch h.storageDriver {
-	case DevicemapperStorageDriver:
-		// Device has to be the pool name to correlate with the device name as
-		// set in the machine info filesystems.
-		device = h.poolName
-	case AufsStorageDriver, OverlayStorageDriver, Overlay2StorageDriver, VfsStorageDriver:
-		deviceInfo, err := h.fsInfo.GetDirFsDevice(h.rootfsStorageDir)
-		if err != nil {
-			return fmt.Errorf("unable to determine device info for dir: %v: %v", h.rootfsStorageDir, err)
-		}
-		device = deviceInfo.Device
-	case ZfsStorageDriver:
-		device = h.zfsParent
-	default:
-		return nil
-	}
-
-	var (
-		limit  uint64
-		fsType string
-	)
-
-	var fsInfo *info.FsInfo
-
-	// Docker does not impose any filesystem limits for containers. So use capacity as limit.
-	for _, fs := range mi.Filesystems {
-		if fs.Device == device {
-			limit = fs.Capacity
-			fsType = fs.Type
-			fsInfo = &fs
-			break
-		}
-	}
-
-	fsStat := info.FsStats{Device: device, Type: fsType, Limit: limit}
-	usage := h.fsHandler.Usage()
-	fsStat.BaseUsage = usage.BaseUsageBytes
-	fsStat.Usage = usage.TotalUsageBytes
-	fsStat.Inodes = usage.InodeUsage
-
-	if fsInfo != nil {
-		fileSystems, err := h.fsInfo.GetGlobalFsInfo()
-
-		if err == nil {
-			addDiskStats(fileSystems, fsInfo, &fsStat)
-		} else {
-			klog.Errorf("Unable to obtain diskstats for filesystem %s: %v", fsStat.Device, err)
-		}
-	}
-
-	stats.Filesystem = append(stats.Filesystem, fsStat)
-
-	return nil
-}
-
-func addDiskStats(fileSystems []fs.Fs, fsInfo *info.FsInfo, fsStats *info.FsStats) {
-	if fsInfo == nil {
-		return
-	}
-
-	for _, fileSys := range fileSystems {
-		if fsInfo.DeviceMajor == fileSys.DiskStats.Major &&
-			fsInfo.DeviceMinor == fileSys.DiskStats.Minor {
-			fsStats.ReadsCompleted = fileSys.DiskStats.ReadsCompleted
-			fsStats.ReadsMerged = fileSys.DiskStats.ReadsMerged
-			fsStats.SectorsRead = fileSys.DiskStats.SectorsRead
-			fsStats.ReadTime = fileSys.DiskStats.ReadTime
-			fsStats.WritesCompleted = fileSys.DiskStats.WritesCompleted
-			fsStats.WritesMerged = fileSys.DiskStats.WritesMerged
-			fsStats.SectorsWritten = fileSys.DiskStats.SectorsWritten
-			fsStats.WriteTime = fileSys.DiskStats.WriteTime
-			fsStats.IoInProgress = fileSys.DiskStats.IoInProgress
-			fsStats.IoTime = fileSys.DiskStats.IoTime
-			fsStats.WeightedIoTime = fileSys.DiskStats.WeightedIoTime
-			break
-		}
-	}
-}
-
 // TODO(vmarmol): Get from libcontainer API instead of cgroup manager when we don't have to support older Dockers.
 func (h *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
 	stats, err := h.libcontainerHandler.GetStats()
@@ -475,7 +382,8 @@ func (h *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
 	}
 
 	// Get filesystem stats.
-	err = h.getFsStats(stats)
+	err = GetFsStats(stats, h.machineInfoFactory, h.includedMetrics, h.storageDriver,
+		h.fsHandler, h.fsInfo, h.poolName, h.rootfsStorageDir, h.zfsParent)
 	if err != nil {
 		return stats, err
 	}
