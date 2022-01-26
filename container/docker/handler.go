@@ -273,65 +273,6 @@ func DetermineDeviceStorage(storageDriver StorageDriver, storageDir string, rwLa
 	return
 }
 
-// dockerFsHandler is a composite FsHandler implementation the incorporates
-// the common fs handler, a devicemapper ThinPoolWatcher, and a zfsWatcher
-type dockerFsHandler struct {
-	fsHandler common.FsHandler
-
-	// thinPoolWatcher is the devicemapper thin pool watcher
-	thinPoolWatcher *devicemapper.ThinPoolWatcher
-	// deviceID is the id of the container's fs device
-	deviceID string
-
-	// zfsWatcher is the zfs filesystem watcher
-	zfsWatcher *zfs.ZfsWatcher
-	// zfsFilesystem is the docker zfs filesystem
-	zfsFilesystem string
-}
-
-var _ common.FsHandler = &dockerFsHandler{}
-
-func (h *dockerFsHandler) Start() {
-	h.fsHandler.Start()
-}
-
-func (h *dockerFsHandler) Stop() {
-	h.fsHandler.Stop()
-}
-
-func (h *dockerFsHandler) Usage() common.FsUsage {
-	usage := h.fsHandler.Usage()
-
-	// When devicemapper is the storage driver, the base usage of the container comes from the thin pool.
-	// We still need the result of the fsHandler for any extra storage associated with the container.
-	// To correctly factor in the thin pool usage, we should:
-	// * Usage the thin pool usage as the base usage
-	// * Calculate the overall usage by adding the overall usage from the fs handler to the thin pool usage
-	if h.thinPoolWatcher != nil {
-		thinPoolUsage, err := h.thinPoolWatcher.GetUsage(h.deviceID)
-		if err != nil {
-			// TODO: ideally we should keep track of how many times we failed to get the usage for this
-			// device vs how many refreshes of the cache there have been, and display an error e.g. if we've
-			// had at least 1 refresh and we still can't find the device.
-			klog.V(5).Infof("unable to get fs usage from thin pool for device %s: %v", h.deviceID, err)
-		} else {
-			usage.BaseUsageBytes = thinPoolUsage
-			usage.TotalUsageBytes += thinPoolUsage
-		}
-	}
-
-	if h.zfsWatcher != nil {
-		zfsUsage, err := h.zfsWatcher.GetUsage(h.zfsFilesystem)
-		if err != nil {
-			klog.V(5).Infof("unable to get fs usage from zfs for filesystem %s: %v", h.zfsFilesystem, err)
-		} else {
-			usage.BaseUsageBytes = zfsUsage
-			usage.TotalUsageBytes += zfsUsage
-		}
-	}
-	return usage
-}
-
 func (h *dockerContainerHandler) Start() {
 	if h.fsHandler != nil {
 		h.fsHandler.Start()
