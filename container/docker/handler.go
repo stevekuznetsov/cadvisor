@@ -159,27 +159,9 @@ func newDockerContainerHandler(
 
 	// Determine the rootfs storage dir OR the pool name to determine the device.
 	// For devicemapper, we only need the thin pool name, and that is passed in to this call
-	var (
-		rootfsStorageDir string
-		zfsFilesystem    string
-		zfsParent        string
-	)
-	switch storageDriver {
-	case aufsStorageDriver:
-		rootfsStorageDir = path.Join(storageDir, string(aufsStorageDriver), aufsRWLayer, rwLayerID)
-	case overlayStorageDriver:
-		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID, overlayRWLayer)
-	case overlay2StorageDriver:
-		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID, overlay2RWLayer)
-	case vfsStorageDriver:
-		rootfsStorageDir = path.Join(storageDir)
-	case zfsStorageDriver:
-		status, err := Status()
-		if err != nil {
-			return nil, fmt.Errorf("unable to determine docker status: %v", err)
-		}
-		zfsParent = status.DriverStatus[dockerutil.DriverStatusParentDataset]
-		zfsFilesystem = path.Join(zfsParent, rwLayerID)
+	rootfsStorageDir, zfsFilesystem, zfsParent, err := DetermineDeviceStorage(storageDriver, storageDir, rwLayerID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to determine device storage: %v", err)
 	}
 
 	// We assume that if Inspect fails then the container is not known to docker.
@@ -267,6 +249,29 @@ func newDockerContainerHandler(
 	}
 
 	return handler, nil
+}
+
+func DetermineDeviceStorage(storageDriver StorageDriver, storageDir string, rwLayerID string) (
+	rootfsStorageDir string, zfsFilesystem string, zfsParent string, err error) {
+	switch storageDriver {
+	case AufsStorageDriver:
+		rootfsStorageDir = path.Join(storageDir, string(AufsStorageDriver), aufsRWLayer, rwLayerID)
+	case OverlayStorageDriver:
+		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID, overlayRWLayer)
+	case Overlay2StorageDriver:
+		rootfsStorageDir = path.Join(storageDir, string(storageDriver), rwLayerID, overlay2RWLayer)
+	case VfsStorageDriver:
+		rootfsStorageDir = path.Join(storageDir)
+	case ZfsStorageDriver:
+		var status info.DockerStatus
+		status, err = Status()
+		if err != nil {
+			return
+		}
+		zfsParent = status.DriverStatus[dockerutil.DriverStatusParentDataset]
+		zfsFilesystem = path.Join(zfsParent, rwLayerID)
+	}
+	return
 }
 
 // dockerFsHandler is a composite FsHandler implementation the incorporates
