@@ -221,12 +221,12 @@ func newDockerContainerHandler(
 	handler.ipAddress = ipAddress
 
 	if includedMetrics.Has(container.DiskUsageMetrics) {
-		handler.fsHandler = &dockerFsHandler{
-			fsHandler:       common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, otherStorageDir, fsInfo),
-			thinPoolWatcher: thinPoolWatcher,
-			zfsWatcher:      zfsWatcher,
-			deviceID:        ctnr.GraphDriver.Data["DeviceId"],
-			zfsFilesystem:   zfsFilesystem,
+		handler.fsHandler = &FsHandler{
+			FsHandler:       common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, otherStorageDir, fsInfo),
+			ThinPoolWatcher: thinPoolWatcher,
+			ZfsWatcher:      zfsWatcher,
+			DeviceID:        ctnr.GraphDriver.Data["DeviceId"],
+			ZfsFilesystem:   zfsFilesystem,
 		}
 	}
 
