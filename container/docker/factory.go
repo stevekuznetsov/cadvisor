@@ -220,7 +220,7 @@ var (
 	apiVersionRe           = regexp.MustCompile(apiVersionRegexpString)
 )
 
-func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolWatcher, error) {
+func StartThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolWatcher, error) {
 	_, err := devicemapper.ThinLsBinaryPresent()
 	if err != nil {
 		return nil, err
@@ -357,7 +357,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 	)
 	if includedMetrics.Has(container.DiskUsageMetrics) {
 		if StorageDriver(dockerInfo.Driver) == DevicemapperStorageDriver {
-			thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
+			thinPoolWatcher, err = StartThinPoolWatcher(dockerInfo)
 			if err != nil {
 				klog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
 			}
