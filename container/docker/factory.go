@@ -253,7 +253,7 @@ func StartThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolW
 	return thinPoolWatcher, nil
 }
 
-func startZfsWatcher(dockerInfo *dockertypes.Info) (*zfs.ZfsWatcher, error) {
+func StartZfsWatcher(dockerInfo *dockertypes.Info) (*zfs.ZfsWatcher, error) {
 	filesystem, err := dockerutil.DockerZfsFilesystem(*dockerInfo)
 	if err != nil {
 		return nil, err
@@ -368,7 +368,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 		}
 
 		if StorageDriver(dockerInfo.Driver) == ZfsStorageDriver {
-			zfsWatcher, err = startZfsWatcher(dockerInfo)
+			zfsWatcher, err = StartZfsWatcher(dockerInfo)
 			if err != nil {
 				klog.Errorf("zfs filesystem stats will not be reported: %v", err)
 			}
