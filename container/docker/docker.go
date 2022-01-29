@@ -115,7 +115,38 @@ func Images() ([]v1.DockerImage, error) {
 
 // Checks whether the dockerInfo reflects a valid docker setup, and returns it if it does, or an
 // error otherwise.
-func ValidateInfo() (*dockertypes.Info, error) {
+func ValidateInfo(GetInfo func() (*dockertypes.Info, error), ServerVersion func() (string, error)) (*dockertypes.Info, error) {
+	info, err := GetInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	// Fall back to version API if ServerVersion is not set in info.
+	if info.ServerVersion == "" {
+		var err error
+		info.ServerVersion, err = ServerVersion()
+		if err != nil {
+			return nil, fmt.Errorf("unable to get runtime version: %v", err)
+		}
+	}
+
+	version, err := ParseVersion(info.ServerVersion, VersionRe, 3)
+	if err != nil {
+		return nil, err
+	}
+
+	if version[0] < 1 {
+		return nil, fmt.Errorf("cAdvisor requires runtime version %v or above but we have found version %v reported as %q", []int{1, 0, 0}, version, info.ServerVersion)
+	}
+
+	if info.Driver == "" {
+		return nil, fmt.Errorf("failed to find runtime storage driver")
+	}
+
+	return info, nil
+}
+
+func GetInfo() (*dockertypes.Info, error) {
 	client, err := Client()
 	if err != nil {
 		return nil, fmt.Errorf("unable to communicate with docker daemon: %v", err)
@@ -124,27 +155,6 @@ func ValidateInfo() (*dockertypes.Info, error) {
 	dockerInfo, err := client.Info(defaultContext())
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect Docker info: %v", err)
-	}
-
-	// Fall back to version API if ServerVersion is not set in info.
-	if dockerInfo.ServerVersion == "" {
-		version, err := client.ServerVersion(defaultContext())
-		if err != nil {
-			return nil, fmt.Errorf("unable to get docker version: %v", err)
-		}
-		dockerInfo.ServerVersion = version.Version
-	}
-	version, err := ParseVersion(dockerInfo.ServerVersion, VersionRe, 3)
-	if err != nil {
-		return nil, err
-	}
-
-	if version[0] < 1 {
-		return nil, fmt.Errorf("cAdvisor requires docker version %v or above but we have found version %v reported as %q", []int{1, 0, 0}, version, dockerInfo.ServerVersion)
-	}
-
-	if dockerInfo.Driver == "" {
-		return nil, fmt.Errorf("failed to find docker storage driver")
 	}
 
 	return &dockerInfo, nil
