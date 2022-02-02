@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	dockertypes "github.com/docker/docker/api/types"
+	v1 "github.com/google/cadvisor/info/v1"
 )
 
 const (
@@ -74,4 +75,24 @@ func DockerZfsFilesystem(info dockertypes.Info) (string, error) {
 	}
 
 	return filesystem, nil
+}
+
+func SummariesToImages(summaries []dockertypes.ImageSummary) ([]v1.DockerImage, error) {
+	var out []v1.DockerImage
+	const unknownTag = "<none>:<none>"
+	for _, summary := range summaries {
+		if len(summary.RepoTags) == 1 && summary.RepoTags[0] == unknownTag {
+			// images with repo or tags are uninteresting.
+			continue
+		}
+		di := v1.DockerImage{
+			ID:          summary.ID,
+			RepoTags:    summary.RepoTags,
+			Created:     summary.Created,
+			VirtualSize: summary.VirtualSize,
+			Size:        summary.Size,
+		}
+		out = append(out, di)
+	}
+	return out, nil
 }

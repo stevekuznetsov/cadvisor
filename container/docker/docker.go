@@ -19,12 +19,12 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
 	"golang.org/x/net/context"
 
-	"time"
-
+	"github.com/google/cadvisor/container/docker/utils"
 	v1 "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/machine"
 )
@@ -88,29 +88,11 @@ func Images() ([]v1.DockerImage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to communicate with docker daemon: %v", err)
 	}
-	images, err := client.ImageList(defaultContext(), dockertypes.ImageListOptions{All: false})
+	summaries, err := client.ImageList(defaultContext(), dockertypes.ImageListOptions{All: false})
 	if err != nil {
 		return nil, err
 	}
-
-	out := []v1.DockerImage{}
-	const unknownTag = "<none>:<none>"
-	for _, image := range images {
-		if len(image.RepoTags) == 1 && image.RepoTags[0] == unknownTag {
-			// images with repo or tags are uninteresting.
-			continue
-		}
-		di := v1.DockerImage{
-			ID:          image.ID,
-			RepoTags:    image.RepoTags,
-			Created:     image.Created,
-			VirtualSize: image.VirtualSize,
-			Size:        image.Size,
-		}
-		out = append(out, di)
-	}
-	return out, nil
-
+	return utils.SummariesToImages(summaries)
 }
 
 // Checks whether the dockerInfo reflects a valid docker setup, and returns it if it does, or an
