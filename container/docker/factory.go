@@ -17,7 +17,6 @@ package docker
 import (
 	"flag"
 	"fmt"
-	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -58,10 +57,6 @@ const rootDirRetries = 5
 
 // The retry period for getting docker root dir, Millisecond
 const rootDirRetryPeriod time.Duration = 1000 * time.Millisecond
-
-// Regexp that identifies docker cgroups, containers started with
-// --cgroup-parent have another prefix than 'docker'
-var dockerCgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
 
 var (
 	// Basepath to all container specific information that libcontainer stores.
@@ -169,36 +164,15 @@ func (f *dockerFactory) NewContainerHandler(name string, metadataEnvAllowList []
 	return
 }
 
-// Returns the Docker ID from the full container name.
-func ContainerNameToDockerId(name string) string {
-	id := path.Base(name)
-
-	if matches := dockerCgroupRegexp.FindStringSubmatch(id); matches != nil {
-		return matches[1]
-	}
-
-	return id
-}
-
-// isContainerName returns true if the cgroup with associated name
-// corresponds to a docker container.
-func isContainerName(name string) bool {
-	// always ignore .mount cgroup even if associated with docker and delegate to systemd
-	if strings.HasSuffix(name, ".mount") {
-		return false
-	}
-	return dockerCgroupRegexp.MatchString(path.Base(name))
-}
-
 // Docker handles all containers under /docker
 func (f *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	// if the container is not associated with docker, we can't handle it or accept it.
-	if !isContainerName(name) {
+	if !dockerutil.IsContainerName(name) {
 		return false, false, nil
 	}
 
 	// Check if the container is known to docker and it is active.
-	id := ContainerNameToDockerId(name)
+	id := dockerutil.ContainerNameToId(name)
 
 	// We assume that if Inspect fails then the container is not known to docker.
 	ctnr, err := f.client.ContainerInspect(context.Background(), id)

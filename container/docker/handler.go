@@ -145,7 +145,7 @@ func newDockerContainerHandler(
 		storageDir = path.Join(rootFs, storageDir)
 	}
 
-	id := ContainerNameToDockerId(name)
+	id := dockerutil.ContainerNameToId(name)
 
 	// Add the Containers dir where the log files are stored.
 	// FIXME: Give `otherStorageDir` a more descriptive name.

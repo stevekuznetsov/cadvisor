@@ -17,6 +17,8 @@ package utils
 import (
 	"fmt"
 	"os"
+	"path"
+	"regexp"
 	"strings"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -28,6 +30,10 @@ const (
 	DriverStatusMetadataFile  = "Metadata file"
 	DriverStatusParentDataset = "Parent Dataset"
 )
+
+// Regexp that identifies docker cgroups, containers started with
+// --cgroup-parent have another prefix than 'docker'
+var cgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
 
 func DriverStatusValue(status [][2]string, target string) string {
 	for _, v := range status {
@@ -95,4 +101,25 @@ func SummariesToImages(summaries []dockertypes.ImageSummary) ([]v1.DockerImage, 
 		out = append(out, di)
 	}
 	return out, nil
+}
+
+// Returns the ID from the full container name.
+func ContainerNameToId(name string) string {
+	id := path.Base(name)
+
+	if matches := cgroupRegexp.FindStringSubmatch(id); matches != nil {
+		return matches[1]
+	}
+
+	return id
+}
+
+// IsContainerName returns true if the cgroup with associated name
+// corresponds to a container.
+func IsContainerName(name string) bool {
+	// always ignore .mount cgroup even if associated with docker and delegate to systemd
+	if strings.HasSuffix(name, ".mount") {
+		return false
+	}
+	return cgroupRegexp.MatchString(path.Base(name))
 }

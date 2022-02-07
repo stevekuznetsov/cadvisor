@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/google/cadvisor/container/docker"
+	dockerutil "github.com/google/cadvisor/container/docker/utils"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/manager"
 
@@ -73,7 +74,7 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) {
 		for _, cont := range conts {
 			subcontainers = append(subcontainers, link{
 				Text: getContainerDisplayName(cont.ContainerReference),
-				Link: path.Join(rootDir, DockerPage, docker.ContainerNameToDockerId(cont.ContainerReference.Name)),
+				Link: path.Join(rootDir, DockerPage, dockerutil.ContainerNameToId(cont.ContainerReference.Name)),
 			})
 		}
 
@@ -126,7 +127,7 @@ func serveDockerPage(m manager.Manager, w http.ResponseWriter, u *url.URL) {
 		})
 		parentContainers = append(parentContainers, link{
 			Text: displayName,
-			Link: path.Join(rootDir, DockerPage, docker.ContainerNameToDockerId(cont.Name)),
+			Link: path.Join(rootDir, DockerPage, dockerutil.ContainerNameToId(cont.Name)),
 		})
 
 		// Get the MachineInfo
