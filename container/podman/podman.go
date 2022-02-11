@@ -35,6 +35,30 @@ const (
 
 var timeout = 10 * time.Second
 
+func validateResponse(gotError error, response *http.Response) error {
+	var err error
+	switch {
+	case response == nil:
+		err = fmt.Errorf("response not present")
+	case response.StatusCode == http.StatusNotFound:
+		err = fmt.Errorf("item not found")
+	case response.StatusCode == http.StatusNotImplemented:
+		err = fmt.Errorf("query not implemented")
+	case response.StatusCode != http.StatusOK:
+		err = fmt.Errorf("status not ok")
+	case gotError == nil:
+		return nil
+	default:
+		return gotError
+	}
+
+	if gotError != nil {
+		err = fmt.Errorf("%v: %v", err, gotError)
+	}
+
+	return err
+}
+
 func apiGetRequest(url string, item interface{}) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -50,6 +74,7 @@ func apiGetRequest(url string, item interface{}) error {
 	}
 
 	resp, err := conn.Client.Do(req)
+	err = validateResponse(err, resp)
 	if err != nil {
 		return err
 	}
