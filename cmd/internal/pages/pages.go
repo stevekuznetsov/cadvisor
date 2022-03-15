@@ -99,6 +99,12 @@ func dockerHandler(containerManager manager.Manager) auth.AuthenticatedHandlerFu
 	}
 }
 
+func podmanHandlerNoAuth(containerManager manager.Manager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		servePodmanPage(containerManager, w, r.URL)
+	}
+}
+
 // Register http handlers
 func RegisterHandlersDigest(mux httpmux.Mux, containerManager manager.Manager, authenticator *auth.DigestAuth, urlBasePrefix string) error {
 	// Register the handler for the containers page.
@@ -127,9 +133,11 @@ func RegisterHandlersBasic(mux httpmux.Mux, containerManager manager.Manager, au
 	if authenticator != nil {
 		mux.HandleFunc(ContainersPage, authenticator.Wrap(containerHandler(containerManager)))
 		mux.HandleFunc(DockerPage, authenticator.Wrap(dockerHandler(containerManager)))
+		// TODO (Creatone): Add Podman.
 	} else {
 		mux.HandleFunc(ContainersPage, containerHandlerNoAuth(containerManager))
 		mux.HandleFunc(DockerPage, dockerHandlerNoAuth(containerManager))
+		mux.HandleFunc(PodmanPage, podmanHandlerNoAuth(containerManager))
 	}
 
 	if ContainersPage[len(ContainersPage)-1] == '/' {

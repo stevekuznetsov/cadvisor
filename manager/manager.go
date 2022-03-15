@@ -31,6 +31,7 @@ import (
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
+	"github.com/google/cadvisor/container/podman"
 	"github.com/google/cadvisor/container/raw"
 	"github.com/google/cadvisor/events"
 	"github.com/google/cadvisor/fs"
@@ -60,7 +61,9 @@ var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=1
 var applicationMetricsCountLimit = flag.Int("application_metrics_count_limit", 100, "Max number of application metrics to store (per container)")
 
 // The namespace under which Docker aliases are unique.
-const DockerNamespace = "docker"
+const (
+	DockerNamespace = "docker"
+)
 
 var HousekeepingConfigFlags = HouskeepingConfig{
 	flag.Duration("max_housekeeping_interval", 60*time.Second, "Largest interval to allow between container housekeepings"),
@@ -137,6 +140,10 @@ type Manager interface {
 
 	// Returns debugging information. Map of lines per category.
 	DebugInfo() map[string][]string
+
+	AllPodmanContainers(c *info.ContainerInfoRequest) (map[string]info.ContainerInfo, error)
+
+	PodmanContainer(containerName string, query *info.ContainerInfoRequest) (info.ContainerInfo, error)
 }
 
 // Housekeeping configuration for the manager
@@ -268,6 +275,19 @@ type manager struct {
 	rawContainerCgroupPathPrefixWhiteList []string
 	// List of container env prefix whitelist, the matched container envs would be collected into metrics as extra labels.
 	containerEnvMetadataWhiteList []string
+}
+
+func (m *manager) PodmanContainer(containerName string, query *info.ContainerInfoRequest) (info.ContainerInfo, error) {
+	container, err := m.getNamespacedContainer(containerName, podman.Namespace)
+	if err != nil {
+		return info.ContainerInfo{}, err
+	}
+
+	inf, err := m.containerDataToContainerInfo(container, query)
+	if err != nil {
+		return info.ContainerInfo{}, err
+	}
+	return *inf, nil
 }
 
 // Start the container manager.
@@ -587,14 +607,14 @@ func (m *manager) SubcontainersInfo(containerName string, query *info.ContainerI
 	return m.containerDataSliceToContainerInfoSlice(containers, query)
 }
 
-func (m *manager) getAllDockerContainers() map[string]*containerData {
+func (m *manager) getAllNamespacedContainers(ns string) map[string]*containerData {
 	m.containersLock.RLock()
 	defer m.containersLock.RUnlock()
 	containers := make(map[string]*containerData, len(m.containers))
 
-	// Get containers in the Docker namespace.
+	// Get containers in a namespace.
 	for name, cont := range m.containers {
-		if name.Namespace == DockerNamespace {
+		if name.Namespace == ns {
 			containers[cont.info.Name] = cont
 		}
 	}
@@ -602,48 +622,34 @@ func (m *manager) getAllDockerContainers() map[string]*containerData {
 }
 
 func (m *manager) AllDockerContainers(query *info.ContainerInfoRequest) (map[string]info.ContainerInfo, error) {
-	containers := m.getAllDockerContainers()
-
-	output := make(map[string]info.ContainerInfo, len(containers))
-	for name, cont := range containers {
-		inf, err := m.containerDataToContainerInfo(cont, query)
-		if err != nil {
-			// Ignore the error because of race condition and return best-effort result.
-			if err == memory.ErrDataNotFound {
-				klog.Warningf("Error getting data for container %s because of race condition", name)
-				continue
-			}
-			return nil, err
-		}
-		output[name] = *inf
-	}
-	return output, nil
+	containers := m.getAllNamespacedContainers(DockerNamespace)
+	return m.getContainersInfo(containers, query)
 }
 
-func (m *manager) getDockerContainer(containerName string) (*containerData, error) {
+func (m *manager) getNamespacedContainer(containerName string, ns string) (*containerData, error) {
 	m.containersLock.RLock()
 	defer m.containersLock.RUnlock()
 
-	// Check for the container in the Docker container namespace.
+	// Check for the container in the namespace.
 	cont, ok := m.containers[namespacedContainerName{
-		Namespace: DockerNamespace,
+		Namespace: ns,
 		Name:      containerName,
 	}]
 
 	// Look for container by short prefix name if no exact match found.
 	if !ok {
 		for contName, c := range m.containers {
-			if contName.Namespace == DockerNamespace && strings.HasPrefix(contName.Name, containerName) {
+			if contName.Namespace == ns && strings.HasPrefix(contName.Name, containerName) {
 				if cont == nil {
 					cont = c
 				} else {
-					return nil, fmt.Errorf("unable to find container. Container %q is not unique", containerName)
+					return nil, fmt.Errorf("unable to find container in %q namespace. Container %q is not unique", ns, containerName)
 				}
 			}
 		}
 
 		if cont == nil {
-			return nil, fmt.Errorf("unable to find Docker container %q", containerName)
+			return nil, fmt.Errorf("unable to find container %q in %q namespace", containerName, ns)
 		}
 	}
 
@@ -651,7 +657,7 @@ func (m *manager) getDockerContainer(containerName string) (*containerData, erro
 }
 
 func (m *manager) DockerContainer(containerName string, query *info.ContainerInfoRequest) (info.ContainerInfo, error) {
-	container, err := m.getDockerContainer(containerName)
+	container, err := m.getNamespacedContainer(containerName, DockerNamespace)
 	if err != nil {
 		return info.ContainerInfo{}, err
 	}
@@ -726,7 +732,7 @@ func (m *manager) getRequestedContainers(containerName string, options v2.Reques
 	case v2.TypeDocker:
 		if !options.Recursive {
 			containerName = strings.TrimPrefix(containerName, "/")
-			cont, err := m.getDockerContainer(containerName)
+			cont, err := m.getNamespacedContainer(containerName, DockerNamespace)
 			if err != nil {
 				return containersMap, err
 			}
@@ -735,7 +741,7 @@ func (m *manager) getRequestedContainers(containerName string, options v2.Reques
 			if containerName != "/" {
 				return containersMap, fmt.Errorf("invalid request for docker container %q with subcontainers", containerName)
 			}
-			containersMap = m.getAllDockerContainers()
+			containersMap = m.getAllNamespacedContainers(DockerNamespace)
 		}
 	default:
 		return containersMap, fmt.Errorf("invalid request type %q", options.IdType)
@@ -1372,6 +1378,28 @@ func (m *manager) getFsInfoByDeviceName(deviceName string) (v2.FsInfo, error) {
 		}
 	}
 	return v2.FsInfo{}, fmt.Errorf("cannot find filesystem info for device %q", deviceName)
+}
+
+func (m *manager) getContainersInfo(containers map[string]*containerData, query *info.ContainerInfoRequest) (map[string]info.ContainerInfo, error) {
+	output := make(map[string]info.ContainerInfo, len(containers))
+	for name, cont := range containers {
+		inf, err := m.containerDataToContainerInfo(cont, query)
+		if err != nil {
+			// Ignore the error because of race condition and return best-effort result.
+			if err == memory.ErrDataNotFound {
+				klog.Warningf("Error getting data for container %s because of race condition", name)
+				continue
+			}
+			return nil, err
+		}
+		output[name] = *inf
+	}
+	return output, nil
+}
+
+func (m *manager) AllPodmanContainers(query *info.ContainerInfoRequest) (map[string]info.ContainerInfo, error) {
+	containers := m.getAllNamespacedContainers(podman.Namespace)
+	return m.getContainersInfo(containers, query)
 }
 
 func getVersionInfo() (*info.VersionInfo, error) {
