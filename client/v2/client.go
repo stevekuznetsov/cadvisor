@@ -95,6 +95,7 @@ func (c *Client) Stats(name string, request *v2.RequestOptions) (map[string]v2.C
 		"type":      []string{request.IdType},
 		"count":     []string{strconv.Itoa(request.Count)},
 		"recursive": []string{strconv.FormatBool(request.Recursive)},
+		"max_age":   []string{request.MaxAge.String()},
 	}
 
 	u = fmt.Sprintf("%s?%s", u, data.Encode())
