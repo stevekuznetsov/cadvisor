@@ -166,6 +166,7 @@ func (f *dockerFactory) NewContainerHandler(name string, metadataEnvAllowList []
 
 // Docker handles all containers under /docker
 func (f *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
+	return false, false, nil
 	// if the container is not associated with docker, we can't handle it or accept it.
 	if !dockerutil.IsContainerName(name) {
 		return false, false, nil
